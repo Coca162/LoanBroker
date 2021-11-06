@@ -28,7 +28,7 @@ public static class AccountSystem
     static async void HandleTransaction(Transaction transaction)
     {
 
-        if (transaction.Detail != "UBI Payment")
+        if (transaction.Detail != "UBI Payment" || transaction.FromAccount != "g-a79c4e06-ca17-4212-8e75-3964e8fe7015")
         {
             return;
         }
