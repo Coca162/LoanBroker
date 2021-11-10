@@ -3,6 +3,7 @@ using SpookVooper.Api;
 using System.ComponentModel.DataAnnotations;
 using static Discord.Commands.UBI;
 using static SpookVooper.Api.SpookVooperAPI;
+using SpookVooper.Api.Entities;
 
 namespace LoanBroker.Models;
 public class BrokerAccount
@@ -118,6 +119,10 @@ public class BrokerAccount
             loaner.Percent = data[i][0]/total;
             i += 1;
         }
+
+        Entity fromEntity = new(AccountSystem.GroupSVID);
+
+        TaskResult res = await fromEntity.SendCreditsAsync(amount, loan.SVID, $"Loan from Cocabot");
 
         return new TaskResult(true, $"Successfully took out a loan of ¢{amount} at avg interest of {Math.Round(loan.Interest * 100, 2)}");
     }
