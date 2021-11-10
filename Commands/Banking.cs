@@ -4,6 +4,10 @@ using DSharpPlus.CommandsNext.Attributes;
 using Shared.Models;
 using DSharpPlus.Entities;
 using Microsoft.EntityFrameworkCore;
+using static SpookVooper.Api.SpookVooperAPI;
+using SpookVooper.Api;
+using SpookVooper.Api.Entities;
+using Shared;
 
 namespace LoanBroker.Commands;
 public class Banking : BaseCommandModule
@@ -30,6 +34,35 @@ public class Banking : BaseCommandModule
         Embed.AddField("Interest Rate", $"{Math.Round(deposit.Interest * 100, 2)}%");
 
         ctx.RespondAsync(Embed);
+    }
+
+    [Command("deposit")]
+    public async Task DepositCommand(CommandContext ctx, decimal amount)
+    {
+        BrokerAccount account = await db.BrokerAccounts.FirstOrDefaultAsync(x => x.DiscordId == ctx.User.Id);
+
+        Deposit deposit = await db.Deposits.FirstOrDefaultAsync(x => x.SVID == account.SVID);
+
+        Entity fromEntity = new(account.SVID);
+
+        CocaBotContext cb = new();
+
+        string token = (await cb.Users.FindAsync(account.SVID)).Token;
+
+        fromEntity.Auth_Key = token + "|" + Main.config.OauthSecret;
+
+        TaskResult result = await fromEntity.SendCreditsAsync(amount, AccountSystem.GroupSVID, $"Deposit into CLB group");
+
+        if (result.Succeeded)
+        {
+            deposit.Amount += amount;
+        }
+        else
+        {
+            ctx.RespondAsync(result.Info);
+        }
+
+        await db.SaveChangesAsync();
     }
 
     [Command("setinterestrate")]
