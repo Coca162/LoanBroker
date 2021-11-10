@@ -6,6 +6,7 @@ public class Loaner
 {
     [Key]
     public int ID { get; set; }
+    public int LoanId { get; set; }
     public string SVID { get; set; }
     public decimal Percent { get; set; }
 }
