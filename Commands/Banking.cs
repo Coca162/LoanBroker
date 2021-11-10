@@ -36,6 +36,19 @@ public class Banking : BaseCommandModule
         ctx.RespondAsync(Embed);
     }
 
+    [Command("loan")]
+    public async Task DepositCommand(CommandContext ctx, decimal amount)
+    {
+        // coca make this have a command to confirm it like
+        // Do you want to take out loan of 100 at 1% interest?
+        // /loan confirm
+        BrokerAccount account = await db.BrokerAccounts.FirstOrDefaultAsync(x => x.DiscordId == ctx.User.Id);
+
+        TaskResult result = await account.TakeOutLoan(db, amount);
+
+        ctx.RespondAsync(result.Info);
+    }
+
     [Command("deposit")]
     public async Task DepositCommand(CommandContext ctx, decimal amount)
     {
