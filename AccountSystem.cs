@@ -66,7 +66,7 @@ public static class AccountSystem
                         Entity fromEntity = new(transaction.FromAccount);
                         fromEntity.Auth_Key = token + "|" + Main.config.OauthSecret;
 
-                        TaskResult results = await fromEntity.SendCreditsAsync(rate*loaner.Percent, loaner.SVID, $"CocaBot {platform} /pay");
+                        TaskResult results = await fromEntity.SendCreditsAsync(rate*loaner.Percent, loaner.SVID, $"Auto UBI Loan RePayment");
                     }
 
 
