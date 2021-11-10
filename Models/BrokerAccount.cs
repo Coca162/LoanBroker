@@ -35,7 +35,8 @@ public class BrokerAccount
         decimal total = 0;
         foreach (Loaner loaner in await db.Loaners.Where(x => x.SVID == SVID).ToListAsync())
         {
-            total += loaner.Percent * (await db.Loans.FirstOrDefaultAsync(x => x.ID == loaner.LoanId)).Amount;
+            Loan loan = await db.Loans.FirstOrDefaultAsync(x => x.ID == loaner.LoanId);
+            total += loaner.Percent * (loan.Amount - loan.PaidBack);
         }
         return total;
     }
