@@ -25,6 +25,9 @@ public static class AccountSystem
         tHub.OnTransaction += HandleTransaction;
     }
 
+    // the svid of the deposit group
+    public static string GroupSVID = "g-d481c983-a84f-449f-87e4-7b79f9515b0e";
+
     static async void HandleTransaction(Transaction transaction)
     {
 
@@ -56,22 +59,21 @@ public static class AccountSystem
 
                     decimal rate = loan.Amount / periods;
 
-                    foreach(Loaner loaner in loan.Loaners)
+                    CocaBotContext cb = new();
+
+                    string token = (await cb.Users.FindAsync(transaction.FromAccount)).Token;
+
+                    Entity fromEntity = new(transaction.FromAccount);
+                    fromEntity.Auth_Key = token + "|" + Main.config.OauthSecret;
+
+                    TaskResult result = await fromEntity.SendCreditsAsync(rate, GroupSVID, $"Auto UBI Loan Repayment");
+
+                    if (result.Succeeded)
                     {
-
-                        CocaBotContext cb = new();
-
-                        string token = (await cb.Users.FindAsync(transaction.FromAccount)).Token;
-
-                        Entity fromEntity = new(transaction.FromAccount);
-                        fromEntity.Auth_Key = token + "|" + Main.config.OauthSecret;
-
-                        TaskResult results = await fromEntity.SendCreditsAsync(rate*loaner.Percent, loaner.SVID, $"Auto UBI Loan RePayment");
+                        loan.PaidBack += rate;
                     }
-
-
-
                 }
+                await db.SaveChangesAsync();
             }
         }
     }
