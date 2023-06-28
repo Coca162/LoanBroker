@@ -228,3 +228,4 @@ global.json
 **/secret.json
 
 Migrations/
+/appsettings.json

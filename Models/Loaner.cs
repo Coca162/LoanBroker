@@ -5,8 +5,14 @@ namespace LoanBroker.Models;
 public class Loaner
 {
     [Key]
-    public int ID { get; set; }
-    public int LoanId { get; set; }
-    public string SVID { get; set; }
+    public long Id { get; set; }
+    public long LoanId { get; set; }
+    public long LoanerAccountId { get; set; }
     public decimal Percent { get; set; }
+
+    [ForeignKey(nameof(LoanerAccountId))]
+    public BrokerAccount LoanerAccount { get; set; }
+
+    [ForeignKey(nameof(LoanId))]
+    public Loan Loan { get; set; }
 }

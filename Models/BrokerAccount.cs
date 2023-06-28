@@ -1,30 +1,35 @@
-﻿using Microsoft.EntityFrameworkCore;
-using SpookVooper.Api;
+﻿using LoanBroker.Managers;
+using LoanBroker.Models.NonDBO;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
-using static Discord.Commands.UBI;
-using static SpookVooper.Api.SpookVooperAPI;
-using SpookVooper.Api.Entities;
+using System.Text.Json;
+using Valour.Shared;
 
 namespace LoanBroker.Models;
+
+public enum RepaymentSettingTypes
+{
+    None = 0,
+    MaintainBalance = 1,
+    All = 2
+}
+
 public class BrokerAccount
 {
-    [Key]
-    public string SVID { get; set; }
-    public ulong DiscordId { get; set; }
-    public decimal MaxLoan { get; set; }
-    public bool Approved { get; set; }
+    private static readonly HttpClient client = new HttpClient();
 
-    // exmaple:
-    // Jack has a 10,000 credit loan that is due in 30 days
-    // if this is true, then he will pay ~330 a day or 13.8 per hour (4.6 per UBI payment period)
-    public bool UseAutoUBIToPayBackLoans { get; set; }
+    [Key]
+    public long Id { get; set; }
+    public decimal MaxLoan { get; set; }
+    public string Access_Token { get; set; }
+    public bool TrustedAccount { get; set; }
+    public RepaymentSettingTypes RepaymentSetting { get; set; }
 
     public async Task UpdateMaxLoan()
     {
-        if (!Approved)
+        if (!TrustedAccount)
         {
-            JacobUBIXPData data = await GetDataFromJson<JacobUBIXPData>($"https://ubi.vtech.cf/get_xp_info?id={DiscordId}");
-            MaxLoan = data.DailyUBI * 30;
+            MaxLoan = 50_000;
         }
         else
         {
@@ -32,98 +37,128 @@ public class BrokerAccount
         }
     }
 
-    public async Task<decimal> GetLentOut(BrokerWebContext db)
+    public async Task<decimal> GetLentOut(BrokerContext dbctx)
     {
         decimal total = 0;
-        foreach (Loaner loaner in await db.Loaners.Where(x => x.SVID == SVID).ToListAsync())
+        foreach (Loaner loaner in await dbctx.Loaners.Include(x => x.Loan).Where(x => x.LoanerAccountId == Id).ToListAsync())
         {
-            Loan loan = await db.Loans.FirstOrDefaultAsync(x => x.ID == loaner.LoanId);
-            total += loaner.Percent * (loan.Amount - loan.PaidBack);
+            total += loaner.Percent * (loaner.Loan.BaseAmount - loaner.Loan.PaidBack);
         }
         return total;
     }
-    public async Task<decimal> GetAmountDeposited(BrokerWebContext db)
+    public async Task<decimal> GetAmountDeposited(BrokerContext dbctx)
     {
-        Deposit deposit = await db.Deposits.FirstOrDefaultAsync(x => x.SVID == SVID);
-        if (deposit is null)
-        {
-            return 0;
-        }
-        return deposit.Amount;
+        return await dbctx.Deposits.Where(x => x.AccountId == Id).SumAsync(x => x.Amount);
     }
 
-    public async Task<decimal> GetDepositLeft(BrokerWebContext db)
+    public async Task<decimal> GetDepositLeft(BrokerContext dbctx)
     {
-        return (await GetAmountDeposited(db)) - (await GetLentOut(db));
+        return (await GetAmountDeposited(dbctx)) - (await GetLentOut(dbctx));
     }
 
-    public async Task<decimal> GetLoanedAmount(BrokerWebContext db)
+    public async Task<decimal> GetLoanedAmount(BrokerContext dbctx)
     {
-        decimal total = 0;
-        foreach (Loan loan in await db.Loans.Where(x => x.SVID == SVID).ToListAsync())
-        {
-            total += loan.Amount - loan.PaidBack;
-        }
-        return total;
+        return await dbctx.Loans.Where(x => x.AccountId == Id).SumAsync(x => x.TotalAmount - x.PaidBack);
     }
 
-    public async Task<TaskResult> TakeOutLoan(BrokerWebContext db, decimal amount)
+    public async Task<TaskResult> TakeOutLoan(BrokerContext dbctx, decimal amount, long lengthindays)
     {
-        if ((await GetLoanedAmount(db) + amount) > MaxLoan)
-        {
+        if ((await GetLoanedAmount(dbctx) + amount) > MaxLoan)
             return new TaskResult(false, "You lack the availble credit to take out this loan!");
-        }
 
         decimal got = 0;
+        decimal leftover = 0.0m;
 
-        Loan loan = new();
-        loan.SVID = SVID;
-        loan.Start = DateTime.UtcNow;
+        Loan loan = new()
+        {
+            Id = IdManagers.GeneralIdGenerator.Generate(),
+            AccountId = Id,
+            BaseAmount = amount,
+            PaidBack = 0.00m,
+            Start = DateTime.UtcNow,
+            IsActive = true,
+            End = DateTime.UtcNow.AddDays(lengthindays),
+            TimesLate = 0,
+            LateFees = 0.00m,
+            LateFeesPaid = 0.00m
+        };
 
-        List<List<decimal>> data = new();
+        List<LoanDepositData> data = new();
 
         List<Deposit> areadydid = new();
+        List<long> areadyDidIds = new();
 
         Deposit cheapest = null;
 
         while (got < amount)
         {
-            while (cheapest is null || await ((await cheapest.GetAccount(db)).GetDepositLeft(db)) <= 0)
+            while (cheapest is null || await cheapest.Account.GetDepositLeft(dbctx) <= 0)
             {
-                cheapest = await LoanSystem.GetCheapestDeposit(areadydid);
+                cheapest = await LoanSystem.GetCheapestDeposit(areadyDidIds);
             }
 
-            Loaner loaner = new();
-            loaner.SVID = cheapest.SVID;
-            loaner.LoanId = loan.ID;
+            Loaner loaner = new()
+            {
+                Id = IdManagers.GeneralIdGenerator.Generate(),
+                LoanId = loan.Id,
+                LoanerAccountId = cheapest.AccountId
+            };
 
             loan.Loaners.Add(loaner);
 
-            decimal increase = await (await cheapest.GetAccount(db)).GetDepositLeft(db);
+            decimal increase = cheapest.Amount;
+            if (increase > leftover)
+                increase = leftover;
 
+            leftover -= increase;
             got += increase;
 
-            data.Add(new List<decimal> {increase, cheapest.Interest });
+            data.Add(new() {
+                AmountUsed = increase, 
+                InterestRate = cheapest.Interest,
+                Deposit = cheapest
+            });
 
         }
-        decimal total = data.Sum(x => x[0]);
-        decimal totalrate = data.Sum(x => x[1]*x[0]);
+
+        decimal total = data.Sum(x => x.AmountUsed);
+        decimal totalrate = data.Sum(x => x.InterestRate * x.AmountUsed);
 
         loan.Interest = totalrate / total;
 
-        loan.Amount = amount*loan.Interest;
+        loan.TotalAmount = amount * loan.Interest;
 
         int i = 0;
         foreach (Loaner loaner in loan.Loaners)
         {
-            loaner.Percent = data[i][0]/total;
+            loaner.Percent = data[i].AmountUsed / total;
             i += 1;
         }
 
-        Entity fromEntity = new(AccountSystem.GroupSVID);
+        SVTransaction tran = new(AccountSystem.GroupSVID, Id, amount, SVConfig.instance.GroupApiKey, "Loan from NVTech Loan Broker", 1);
+        TaskResult result = await tran.ExecuteAsync(client);
+        if (result.Success)
+        {
+            LoanSystem.CurrentBaseInterestRate = loan.Interest;
+            foreach (var dataobject in data)
+            {
+                dataobject.Deposit.Amount -= dataobject.AmountUsed;
+                if (dataobject.Deposit.Amount <= 0.01m)
+                    dataobject.Deposit.IsActive = false;
+            }
+        }
+        else
+        {
 
-        TaskResult res = await fromEntity.SendCreditsAsync(amount, loan.SVID, $"Loan from Cocabot");
+        }
 
         return new TaskResult(true, $"Successfully took out a loan of ¢{amount} at avg interest of {Math.Round(loan.Interest * 100, 2)}");
     }
+}
+
+public class LoanDepositData
+{
+    public decimal AmountUsed { get; set; }
+    public decimal InterestRate { get; set; }
+    public Deposit Deposit { get; set; }
 }

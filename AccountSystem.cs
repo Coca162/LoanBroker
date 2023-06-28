@@ -1,81 +1,71 @@
-﻿using DSharpPlus;
-using DSharpPlus.CommandsNext;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
-using Shared;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Timers;
-using SpookVooper.Api;
-using SpookVooper.Api.Entities;
-using DSharpPlus.Entities;
-using static Shared.Main;
 using LoanBroker.Models;
-using SpookVooper.Api.Economy;
+using System.Security.Principal;
+using Valour.Shared;
+using IdGen;
+using LoanBroker.Models.NonDBO;
+using LoanBroker.Managers;
 
 public static class AccountSystem
 {
-    public static void HookTransactionHub()
-    {
-        // Create transaction hub object
-        TransactionHub tHub = new();
-
-        // Hook transaction event to method
-        tHub.OnTransaction += HandleTransaction;
-    }
-
+    private static readonly HttpClient client = new HttpClient();
     // the svid of the deposit group
-    public static string GroupSVID = "g-d481c983-a84f-449f-87e4-7b79f9515b0e";
+#if DEBUG
+    public static long GroupSVID = 20332568570233088;
+#else
+    public static long GroupSVID = 0;
+#endif
 
-    static async void HandleTransaction(Transaction transaction)
+    public static async Task DoHourlyTick()
     {
+        using var dbctx = BrokerContext.DbFactory.CreateDbContext();
+        List<Loan> loans = await dbctx.Loans.Include(x => x.Account).Include(x => x.Loaners).ThenInclude(x => x.LoanerAccount).ToListAsync();
 
-        if (transaction.Detail != "UBI Payment" || transaction.FromAccount != "g-a79c4e06-ca17-4212-8e75-3964e8fe7015")
+        Dictionary<long, decimal> AmountToReceive = new();
+        foreach (Loan loan in loans)
         {
-            return;
-        }
+            TimeSpan left = loan.End - DateTime.Now;
 
-        BrokerContext db = new();
+            decimal periods = (decimal)((loan.End-DateTime.UtcNow).TotalHours);
 
-        // get account from db
+            decimal rate = (loan.TotalAmount - loan.PaidBack) / periods;
+            decimal latefeesrate = (loan.LateFees - loan.LateFeesPaid) / 72.00m;
+            decimal topay = latefeesrate + rate;
 
-        BrokerAccount account = await db.BrokerAccounts.SingleOrDefaultAsync(x => x.SVID == transaction.FromAccount);
+            SVTransaction tran = new(loan.AccountId, AccountSystem.GroupSVID, topay, loan.Account.Access_Token, "Loan repayment to NVTech Loan Broker", 9);
+            TaskResult result = await tran.ExecuteAsync(client);
 
-        if (account != null)
-        {
-            if (account.UseAutoUBIToPayBackLoans)
+            if (result.Success)
             {
-                List<Loan> loans = await db.Loans.Include(x => x.Loaners).Where(x => x.SVID == account.SVID).ToListAsync();
-                
-                foreach (Loan loan in loans)
+                loan.PaidBack += rate;
+                loan.LateFeesPaid += latefeesrate;
+                foreach (var loaner in loan.Loaners)
                 {
-
-                    TimeSpan left = loan.End - DateTime.Now;
-
-                    // num of UBI pay periods 
-
-                    decimal periods = (decimal)left.TotalMinutes / 20;
-
-                    decimal rate = loan.Amount / periods;
-
-                    CocaBotContext cb = new();
-
-                    string token = (await cb.Users.FindAsync(transaction.FromAccount)).Token;
-
-                    Entity fromEntity = new(transaction.FromAccount);
-                    fromEntity.Auth_Key = token + "|" + Main.config.OauthSecret;
-
-                    TaskResult result = await fromEntity.SendCreditsAsync(rate, GroupSVID, $"Auto UBI Loan Repayment");
-
-                    if (result.Succeeded)
+                    var amount = loaner.Percent * topay;
+                    if (loaner.LoanerAccount.RepaymentSetting == RepaymentSettingTypes.All)
                     {
-                        loan.PaidBack += rate;
+                        dbctx.Deposits.Add(new()
+                        {
+                            Id = IdManagers.GeneralIdGenerator.Generate(),
+                            AccountId = loaner.LoanerAccountId,
+                            Interest = LoanSystem.CurrentBaseInterestRate,
+                            Amount = amount
+                        });
                     }
                 }
-                await db.SaveChangesAsync();
             }
+            else
+            {
+
+            }
+
         }
+        await dbctx.SaveChangesAsync();
     }
 
 
