@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
+using LoanBroker.API;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,7 +31,52 @@ var config = new ConfigurationBuilder()
 builder.Configuration.GetSection("Database").Get<DBConfig>();
 builder.Configuration.GetSection("SV").Get<SVConfig>();
 
+builder.WebHost.ConfigureKestrel((context, options) =>
+{
+    options.Configure(builder.Configuration.GetSection("Kestrel"));
+#if DEBUG
+    options.Listen(IPAddress.Any, 5001, listenOptions => {
+        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2AndHttp3;
+        listenOptions.UseHttps();
+    });
+#else
+    options.Listen(IPAddress.Any, 5001, listenOptions =>
+    {
+        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2AndHttp3;
+    });
+#endif
+});
+
+BrokerContext.DbFactory = BrokerContext.GetDbFactory();
+
 using var dbctx = BrokerContext.DbFactory.CreateDbContext();
+
+string sql = BrokerContext.GenerateSQL();
+
+try
+{
+    await File.WriteAllTextAsync("../Definitions.sql", sql);
+}
+catch (Exception e)
+{
+
+}
+
+BrokerContext.RawSqlQuery<string>(sql, null, true);
+
 LoanSystem.CurrentBaseInterestRate = (await dbctx.Deposits.Where(x => x.IsActive).OrderByDescending(x => x.Interest).LastOrDefaultAsync())?.Interest ?? 5.00m;
 
-await Task.Delay(-1);
+builder.Services.AddDbContextPool<BrokerContext>(options =>
+{
+    options.UseNpgsql(BrokerContext.ConnectionString, options => options.EnableRetryOnFailure());
+});
+
+var app = builder.Build();
+
+app.UseRouting();
+
+app.UseCors();
+
+MainAPI.AddRoutes(app);
+
+app.Run();

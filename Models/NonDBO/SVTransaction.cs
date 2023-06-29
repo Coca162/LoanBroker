@@ -38,6 +38,9 @@ public class SVTransaction
 #endif
         var detail = Detail.Replace(" ", "%20");
         var url = $"{baseurl}/api/eco/transaction/send?fromid={FromSvid}&toid={ToSvid}&amount={Amount}&apikey={ApiKey}&detail={detail}&trantype={TranType}";
-        return JsonSerializer.Deserialize<TaskResult>(await client.GetStringAsync(url));
+        var stringresult = await client.GetStringAsync(url);
+        if (stringresult.Contains("<!DOCTYPE html>"))
+            return new(false, "SV is down");
+        return JsonSerializer.Deserialize<TaskResult>(stringresult);
     }
 }

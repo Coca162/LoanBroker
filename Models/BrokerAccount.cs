@@ -1,5 +1,6 @@
 ﻿using LoanBroker.Managers;
 using LoanBroker.Models.NonDBO;
+using LoanBroker.Models.SVModels;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
@@ -14,6 +15,14 @@ public enum RepaymentSettingTypes
     All = 2
 }
 
+public enum EntityType
+{
+    User,
+    Group,
+    Corporation,
+    District
+}
+
 public class BrokerAccount
 {
     private static readonly HttpClient client = new HttpClient();
@@ -23,18 +32,117 @@ public class BrokerAccount
     public decimal MaxLoan { get; set; }
     public string Access_Token { get; set; }
     public bool TrustedAccount { get; set; }
+    public int CreditScore { get; set; }
     public RepaymentSettingTypes RepaymentSetting { get; set; }
 
-    public async Task UpdateMaxLoan()
+    public decimal GetMuitToBaseInterestRate()
     {
-        if (!TrustedAccount)
+        return (decimal)Math.Min(10, Math.Log(Math.Pow(CreditScore, -1), 1.4) + 21.53);
+    }
+
+    public string GetBaseUrl()
+    {
+#if DEBUG
+        var baseurl = "https://localhost:7186";
+#else
+        var baseurl = "https://spookvooper.com";
+#endif
+        return baseurl;
+    }
+
+    public async Task<List<EntityBalanceRecord>?> GetLast30DaysOfBalanceRecordsAsync()
+    {
+        var url = $"{GetBaseUrl()}/api/entities/{Id}/taxablebalancehistory?days=30";
+        string stringresult = await client.GetStringAsync(url);
+        if (stringresult.Contains("<!DOCTYPE html>"))
+            return null;
+        return JsonSerializer.Deserialize<List<EntityBalanceRecord>>(await client.GetStringAsync(url));
+    }
+
+    public async Task<BaseEntity?> GetEntityAsync()
+    {
+        var url = $"{GetBaseUrl()}/api/entities/{Id}";
+        string stringresult = await client.GetStringAsync(url);
+        if (stringresult.Contains("<!DOCTYPE html>"))
+            return null;
+        return JsonSerializer.Deserialize<BaseEntity>(await client.GetStringAsync(url));
+    }
+
+    public async Task UpdateCreditScore(BrokerContext dbctx)
+    {
+        // TODO: in future, use the entity's networth in calculation
+        var score = 650;
+        var maxloan = 25_000.0m;
+
+        var records = await GetLast30DaysOfBalanceRecordsAsync();
+        if (records is null)
+            return;
+        records.Reverse();
+
+        var now = DateTime.UtcNow;
+        var fromdate = DateTime.UtcNow.AddDays(-365);
+        var loans = await dbctx.Loans.Where(x => x.TimesLate > 0 && x.Start > fromdate).ToListAsync();
+        score -= loans.Sum(x => x.TimesLate) * 10;
+
+        bool IsDistrict = false;
+        bool IsState = false;
+        var entity = await GetEntityAsync();
+        if (entity.EntityType == EntityType.Group || entity.EntityType == EntityType.Corporation)
         {
-            MaxLoan = 50_000;
+            Group group = (Group)entity;
+            if (group.Flags.Contains(GroupFlag.AccreditedBank))
+                score += 75;
+            if (group.GroupType == GroupTypes.District) {
+                score += 50;
+                IsDistrict = true;
+            }
+            else if (group.GroupType == GroupTypes.State) {
+                score += 50;
+                IsState = true;
+            }
         }
-        else
+
+        if (records.Count >= 3)
         {
-            MaxLoan = 500000;
-        }
+            var monthlyprofit = 0.00m;
+            var lastbalance = records.First().TaxableBalance;
+            foreach (var record in records)
+            {
+                monthlyprofit += record.TaxableBalance - lastbalance;
+                lastbalance = record.TaxableBalance;
+            }
+
+            monthlyprofit *= Math.Max(1.0m, 30.0m / records.Count);
+
+            if (monthlyprofit > 0.00m)
+            {
+                // means entity has made a profit
+                maxloan += monthlyprofit * 6 / 2.5m;
+                score += (int)Math.Pow((double)monthlyprofit, 0.4);
+            }
+            else if (monthlyprofit > -1000.00m)
+            {
+                // means entity has made a small loss, most likey a newer entity
+            }
+            else
+            {
+                // means entity has made a loss and their credit score should be reduced because of that
+            }
+        } 
+
+        CreditScore = score;
+
+        if (score > 950)
+            maxloan += 250_000.0m;
+        else if (score > 900)
+            maxloan += 200_000.0m;
+        else if (score > 800)
+            maxloan += 100_000.0m;
+        else if (score > 750)
+            maxloan += 40_000.0m;
+        else if (score > 700)
+            maxloan += 25_000.0m;
+        MaxLoan = maxloan;
     }
 
     public async Task<decimal> GetLentOut(BrokerContext dbctx)
@@ -80,7 +188,9 @@ public class BrokerAccount
             End = DateTime.UtcNow.AddDays(lengthindays),
             TimesLate = 0,
             LateFees = 0.00m,
-            LateFeesPaid = 0.00m
+            LateFeesPaid = 0.00m,
+            LastTimeLateFeeWasApplied = DateTime.UtcNow,
+            LastTimePaid = DateTime.UtcNow
         };
 
         List<LoanDepositData> data = new();
@@ -94,7 +204,7 @@ public class BrokerAccount
         {
             while (cheapest is null || await cheapest.Account.GetDepositLeft(dbctx) <= 0)
             {
-                cheapest = await LoanSystem.GetCheapestDeposit(areadyDidIds);
+                cheapest = await LoanSystem.GetCheapestDeposit(dbctx, areadyDidIds);
             }
 
             Loaner loaner = new()
@@ -125,8 +235,11 @@ public class BrokerAccount
         decimal totalrate = data.Sum(x => x.InterestRate * x.AmountUsed);
 
         loan.Interest = totalrate / total;
+        loan.Interest *= GetMuitToBaseInterestRate();
 
-        loan.TotalAmount = amount * loan.Interest;
+        loan.TotalAmount = amount;
+        var totatInterestRate = loan.Interest / 30.0m * (decimal)(loan.End.Subtract(loan.Start).TotalDays);
+        loan.TotalAmount += amount * totatInterestRate;
 
         int i = 0;
         foreach (Loaner loaner in loan.Loaners)

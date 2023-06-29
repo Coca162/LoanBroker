@@ -31,10 +31,10 @@ public class BrokerContext : DbContext
 {
     public static ILoggerFactory loggerFactory = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Trace));
     public static PooledDbContextFactory<BrokerContext> DbFactory;
+    public static string ConnectionString = $"Host={DBConfig.instance.Host};Database={DBConfig.instance.Database};Username={DBConfig.instance.Username};Pwd={DBConfig.instance.Password};Include Error Detail=true";
 
     public static PooledDbContextFactory<BrokerContext> GetDbFactory()
     {
-        string ConnectionString = $"Host={DBConfig.instance.Host};Database={DBConfig.instance.Database};Username={DBConfig.instance.Username};Pwd={DBConfig.instance.Password};Include Error Detail=true";
         var options = new DbContextOptionsBuilder<BrokerContext>()
             .UseNpgsql(ConnectionString, options =>
             {
@@ -48,9 +48,13 @@ public class BrokerContext : DbContext
         return new PooledDbContextFactory<BrokerContext>(options);
     }
 
+    public BrokerContext(DbContextOptions options)
+    {
+
+    }
+
     protected override void OnConfiguring(DbContextOptionsBuilder options)
     {
-        string ConnectionString = $"Host={DBConfig.instance.Host};Database={DBConfig.instance.Database};Username={DBConfig.instance.Username};Pwd={DBConfig.instance.Password};Include Error Detail=true";
         options.UseNpgsql(ConnectionString, options =>
         {
             options.EnableRetryOnFailure();
