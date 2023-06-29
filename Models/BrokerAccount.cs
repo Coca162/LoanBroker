@@ -4,7 +4,6 @@ using LoanBroker.Models.SVModels;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using Valour.Shared;
 
 namespace LoanBroker.Models;
 
@@ -142,6 +141,11 @@ public class BrokerAccount
             maxloan += 40_000.0m;
         else if (score > 700)
             maxloan += 25_000.0m;
+        if (maxloan > 750_000.0m)
+        {
+            var leftover = maxloan - 750_000.0m;
+            maxloan = 750_000.0m + (decimal)Math.Pow((double)leftover, 0.9);
+        }
         MaxLoan = maxloan;
     }
 
@@ -250,7 +254,7 @@ public class BrokerAccount
 
         SVTransaction tran = new(AccountSystem.GroupSVID, Id, amount, SVConfig.instance.GroupApiKey, "Loan from NVTech Loan Broker", 1);
         TaskResult result = await tran.ExecuteAsync(client);
-        if (result.Success)
+        if (result.Succeeded)
         {
             LoanSystem.CurrentBaseInterestRate = loan.Interest;
             foreach (var dataobject in data)

@@ -47,6 +47,7 @@ public class SVConfig
     public static SVConfig instance;
 
     public string GroupApiKey { get; set; }
+    public string LoanBrokerAPIKey { get; set; }
 
     public SVConfig()
     {

@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using LoanBroker.API;
+using LoanBroker;
+using LoanBroker.Workers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -64,12 +66,16 @@ catch (Exception e)
 
 BrokerContext.RawSqlQuery<string>(sql, null, true);
 
-LoanSystem.CurrentBaseInterestRate = (await dbctx.Deposits.Where(x => x.IsActive).OrderByDescending(x => x.Interest).LastOrDefaultAsync())?.Interest ?? 5.00m;
+await DBCache.LoadAsync();
+
+LoanSystem.CurrentBaseInterestRate = (await dbctx.Loans.Where(x => x.IsActive).OrderByDescending(x => x.Start).FirstOrDefaultAsync())?.Interest ?? 0.05m;
 
 builder.Services.AddDbContextPool<BrokerContext>(options =>
 {
     options.UseNpgsql(BrokerContext.ConnectionString, options => options.EnableRetryOnFailure());
 });
+
+builder.Services.AddHostedService<DepositWorker>();
 
 var app = builder.Build();
 

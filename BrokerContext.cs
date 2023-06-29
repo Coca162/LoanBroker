@@ -117,4 +117,5 @@ public class BrokerContext : DbContext
     public DbSet<Loan> Loans { get; set; }
     public DbSet<Loaner> Loaners { get; set; }
     public DbSet<BrokerAccount> BrokerAccounts { get; set; }
+    public DbSet<TimeInfo> TimeInfos { get; set; }
 }

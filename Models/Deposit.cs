@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace LoanBroker.Models;
 
@@ -16,7 +17,9 @@ public class Deposit
     public decimal TotalAmount { get; set; }
     public bool IsActive { get; set; }
     public DateTime TimeCreated { get; set; }
+    public bool TrackBaselineInterestRate { get; set; }
 
-    [ForeignKey("AccountId")]
-    public BrokerAccount Account { get; set; }
+    [NotMapped]
+    [JsonIgnore]
+    public BrokerAccount Account => DBCache.Get<BrokerAccount>(AccountId);
 }

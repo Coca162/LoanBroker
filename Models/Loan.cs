@@ -30,8 +30,8 @@ public class Loan
     [NotMapped]
     public decimal TotalInterestRate => TotalAmount / BaseAmount - 1.0m;
 
-    [ForeignKey("AccountId")]
-    public BrokerAccount Account { get; set; }
+    [NotMapped]
+    public BrokerAccount Account => DBCache.Get<BrokerAccount>(AccountId);
 
     [InverseProperty("Loan")]
     public List<Loaner> Loaners {  get; set; }

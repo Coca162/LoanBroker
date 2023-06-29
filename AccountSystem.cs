@@ -6,7 +6,6 @@ using System;
 using System.Timers;
 using LoanBroker.Models;
 using System.Security.Principal;
-using Valour.Shared;
 using IdGen;
 using LoanBroker.Models.NonDBO;
 using LoanBroker.Managers;
@@ -22,10 +21,45 @@ public static class AccountSystem
     public static long GroupSVID = 0;
 #endif
 
-    public static async Task DoHourlyTick()
+    public static async Task UpdateDeposits(BrokerContext dbctx)
     {
-        using var dbctx = BrokerContext.DbFactory.CreateDbContext();
-        List<Loan> loans = await dbctx.Loans.Include(x => x.Account).Include(x => x.Loaners).ThenInclude(x => x.LoanerAccount).ToListAsync();
+        // handle deposits tracking baseline interest rate
+        var deposits = await dbctx.Deposits.Where(x => x.IsActive && x.TrackBaselineInterestRate).OrderBy(x => x.TimeCreated).ToListAsync();
+        var count = deposits.Count();
+        if (count == 0)
+            return;
+        // 10% will be below baseline rate
+        var countBelowBaseline = (int)Math.Ceiling(count * 0.1);
+        var countAboveBaseline = count-countBelowBaseline;
+
+        // so if baseline is 5%
+        // range will be 4.75% to 7.5%
+        var lowerBound = LoanSystem.CurrentBaseInterestRate * 0.95m;
+        var upperBound = LoanSystem.CurrentBaseInterestRate * 1.5m;
+        var increasePerDepositForBelow = (LoanSystem.CurrentBaseInterestRate - lowerBound) / countBelowBaseline;
+        var increasePerDepositForAbove = (upperBound - LoanSystem.CurrentBaseInterestRate) / countAboveBaseline;
+
+        int i = 1;
+        decimal currentInterestRate = lowerBound;
+        foreach (var deposit in deposits)
+        {
+            if (i <= countBelowBaseline)
+            {
+                deposit.Interest = currentInterestRate;
+                currentInterestRate += increasePerDepositForBelow;
+            }
+            else
+            {
+                deposit.Interest = currentInterestRate;
+                currentInterestRate += increasePerDepositForAbove;
+            }
+            i += 1;
+        }
+    }
+
+    public static async Task DoHourlyTick(BrokerContext dbctx)
+    {
+        List<Loan> loans = await dbctx.Loans.Include(x => x.Loaners).ToListAsync();
 
         Dictionary<long, decimal> AmountToReceiveToSV = new();
         Dictionary<long, decimal> AmountToReceiveToReDeposit = new();
@@ -46,7 +80,7 @@ public static class AccountSystem
             SVTransaction tran = new(loan.AccountId, AccountSystem.GroupSVID, topay, loan.Account.Access_Token, "Loan repayment to NVTech Loan Broker", 9);
             TaskResult result = await tran.ExecuteAsync(client);
 
-            if (result.Success)
+            if (result.Succeeded)
             {
                 loan.PaidBack += rate;
                 loan.LateFeesPaid += latefeesrate;
@@ -128,7 +162,7 @@ public static class AccountSystem
         {
             SVTransaction tran = new(AccountSystem.GroupSVID, pair.Key, pair.Value, SVConfig.instance.GroupApiKey, "Loan Repayment from NVTech Loan Broker", 1);
             TaskResult result = await tran.ExecuteAsync(client);
-            if (result.Success)
+            if (result.Succeeded)
             {
 
             }
@@ -148,9 +182,5 @@ public static class AccountSystem
                 dbctx.Deposits.Add(deposit);
             }
         }
-
-        await dbctx.SaveChangesAsync();
     }
-
-
 }

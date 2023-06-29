@@ -10,8 +10,8 @@ public class Loaner
     public long LoanerAccountId { get; set; }
     public decimal Percent { get; set; }
 
-    [ForeignKey(nameof(LoanerAccountId))]
-    public BrokerAccount LoanerAccount { get; set; }
+    [NotMapped]
+    public BrokerAccount LoanerAccount => DBCache.Get<BrokerAccount>(LoanerAccountId);
 
     [ForeignKey(nameof(LoanId))]
     public Loan Loan { get; set; }
