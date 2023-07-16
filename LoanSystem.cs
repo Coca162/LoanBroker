@@ -13,6 +13,6 @@ public static class LoanSystem
     {
         return await dbctx.Deposits.Where(x => x.IsActive && !did.Contains(x.Id))
                                     .OrderBy(x => x.Interest).ThenBy(x => x.TimeCreated)
-                                    .SingleAsync();
+                                    .FirstAsync();
     }
 }

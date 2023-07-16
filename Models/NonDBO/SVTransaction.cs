@@ -49,11 +49,12 @@ public class SVTransaction
 #if DEBUG
         var baseurl = "https://localhost:7186";
 #else
-        var baseurl = "https://spookvooper.com";
+        var baseurl = "https://wug.superjacobl.com";
 #endif
         var detail = Detail.Replace(" ", "%20");
         var url = $"{baseurl}/api/eco/transaction/send?fromid={FromSvid}&toid={ToSvid}&amount={Amount}&apikey={ApiKey}&detail={detail}&trantype={TranType}";
-        var stringresult = await client.GetStringAsync(url);
+        var response = await client.GetAsync(url);
+        string stringresult = await response.Content.ReadAsStringAsync();
         if (stringresult.Contains("<!DOCTYPE html>"))
             return new(false, "SV is down");
         Console.WriteLine(stringresult);

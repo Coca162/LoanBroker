@@ -9,7 +9,7 @@ public enum GroupTypes
     Corporation = 1,
     NonProfit = 2,
     PoliticalParty = 3,
-    District = 4,
+    Nation = 4,
     State = 5,
     Province = 6
 }
@@ -25,7 +25,9 @@ public enum GroupFlag
     // is only given by the CFV
     CanSetTransactionsExpenseStatus = 3,
     // is only given by the CFV
-    AccreditedBank = 4
+    AccreditedBank = 4,
+    // is only given by the CFV
+    SeparateEntityFromOwner = 5
 }
 
 public class Group : BaseEntity
@@ -35,4 +37,7 @@ public class Group : BaseEntity
 
     [JsonPropertyName("flags")]
     public List<GroupFlag> Flags { get; set; }
+
+    [JsonPropertyName("ownerId")]
+    public long OwnerId { get; set; }
 }

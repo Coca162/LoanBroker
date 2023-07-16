@@ -16,9 +16,9 @@ public static class AccountSystem
     private static readonly HttpClient client = new HttpClient();
     // the svid of the deposit group
 #if DEBUG
-    public static long GroupSVID = 20332568570233088;
+    public static long GroupSVID = 20711916110610688;
 #else
-    public static long GroupSVID = 0;
+    public static long GroupSVID = 20763151853420800;
 #endif
 
     public static async Task UpdateDeposits(BrokerContext dbctx)
@@ -28,14 +28,14 @@ public static class AccountSystem
         var count = deposits.Count();
         if (count == 0)
             return;
-        // 10% will be below baseline rate
-        var countBelowBaseline = (int)Math.Ceiling(count * 0.1);
+        // 15% will be below baseline rate
+        var countBelowBaseline = (int)Math.Ceiling(count * 0.15);
         var countAboveBaseline = count-countBelowBaseline;
 
         // so if baseline is 5%
         // range will be 4.75% to 7.5%
         var lowerBound = LoanSystem.CurrentBaseInterestRate * 0.95m;
-        var upperBound = LoanSystem.CurrentBaseInterestRate * 1.5m;
+        var upperBound = LoanSystem.CurrentBaseInterestRate * 2.25m;
         var increasePerDepositForBelow = (LoanSystem.CurrentBaseInterestRate - lowerBound) / countBelowBaseline;
         var increasePerDepositForAbove = (upperBound - LoanSystem.CurrentBaseInterestRate) / countAboveBaseline;
 
@@ -95,10 +95,10 @@ public static class AccountSystem
                     }
                     else if (loaner.LoanerAccount.RepaymentSetting == RepaymentSettingTypes.MaintainBalance)
                     {
-                        var amountToDeposit = loaner.Percent * rate * (1 - loan.TotalInterestRate);
+                        var amountToDeposit = rate * (1 / (1 + loan.TotalInterestRate)) * loaner.Percent;
                         if (!AmountToReceiveToReDeposit.ContainsKey(loaner.LoanerAccountId))
                             AmountToReceiveToReDeposit[loaner.LoanerAccountId] = 0;
-                        AmountToReceiveToReDeposit[loaner.LoanerAccountId] += amount;
+                        AmountToReceiveToReDeposit[loaner.LoanerAccountId] += amountToDeposit;
 
                         if (!AmountToReceiveToSV.ContainsKey(loaner.LoanerAccountId))
                             AmountToReceiveToSV[loaner.LoanerAccountId] = 0;
@@ -114,6 +114,7 @@ public static class AccountSystem
             }
             else
             {
+                Console.WriteLine(result.Message);
                 if (result.Message == "SV is down")
                 {
                     await Task.Delay(5000);
@@ -143,19 +144,31 @@ public static class AccountSystem
             }
         }
 
+        var onedayago = DateTime.UtcNow.AddDays(-1);
+        var accountIds = AmountToReceiveToReDeposit.Select(x => x.Key).ToList();
+        var deposits = await dbctx.Deposits.Where(x => x.IsActive && x.TimeCreated > onedayago && x.Type == DepositType.FromAutoRepaymentSetting && accountIds.Contains(x.AccountId)).ToListAsync();
         foreach (var pair in AmountToReceiveToReDeposit)
         {
-            var deposit = new Deposit()
-            {
-                Id = IdManagers.GeneralIdGenerator.Generate(),
-                AccountId = pair.Key,
-                Interest = LoanSystem.CurrentBaseInterestRate,
-                Amount = pair.Value,
-                TotalAmount = pair.Value,
-                IsActive = true,
-                TimeCreated = DateTime.UtcNow,
-            };
-            dbctx.Deposits.Add(deposit);
+            var deposit = deposits.FirstOrDefault(x => x.AccountId == pair.Key);
+            if (deposit is null) {
+                deposit = new Deposit()
+                {
+                    Id = IdManagers.GeneralIdGenerator.Generate(),
+                    AccountId = pair.Key,
+                    Interest = LoanSystem.CurrentBaseInterestRate,
+                    Amount = pair.Value,
+                    TotalAmount = pair.Value,
+                    Type = DepositType.FromAutoRepaymentSetting,
+                    IsActive = true,
+                    TimeCreated = DateTime.UtcNow,
+                    TrackBaselineInterestRate = true
+                };
+                dbctx.Deposits.Add(deposit);
+            }
+            else {
+                deposit.Amount += pair.Value;
+                deposit.TotalAmount += pair.Value;
+            }
         }
 
         foreach (var pair in AmountToReceiveToSV)
@@ -174,6 +187,7 @@ public static class AccountSystem
                     Id = IdManagers.GeneralIdGenerator.Generate(),
                     AccountId = pair.Key,
                     Interest = LoanSystem.CurrentBaseInterestRate,
+                    Type = DepositType.FromAutoRepaymentSetting,
                     Amount = pair.Value,
                     TotalAmount = pair.Value,
                     IsActive = true,

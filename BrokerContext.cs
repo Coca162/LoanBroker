@@ -9,6 +9,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Storage.Internal;
 using System.Text;
 using System.Data.Common;
 using System.Data;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using System.ComponentModel.DataAnnotations.Schema;
 
 /// <summary>A replacement for <see cref="NpgsqlSqlGenerationHelper"/>
 /// to convert PascalCaseCsharpyIdentifiers to alllowercasenames.
@@ -118,4 +120,28 @@ public class BrokerContext : DbContext
     public DbSet<Loaner> Loaners { get; set; }
     public DbSet<BrokerAccount> BrokerAccounts { get; set; }
     public DbSet<TimeInfo> TimeInfos { get; set; }
+}
+
+public class VarChar : ColumnAttribute
+{
+    public VarChar(int length)
+    {
+        TypeName = $"VARCHAR({length})";
+    }
+}
+
+public class BigInt : ColumnAttribute
+{
+    public BigInt()
+    {
+        TypeName = "BIGINT";
+    }
+}
+
+public class DecimalType : ColumnAttribute
+{
+    public DecimalType(int precision = 10)
+    {
+        TypeName = $"NUMERIC(30, {precision})";
+    }
 }

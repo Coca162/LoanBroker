@@ -14,8 +14,11 @@ public class DBCacheItemAddition
         if (Type == typeof(BrokerAccount))
         {
             var account = (BrokerAccount)Item;
-            if (DBCache.Get<BrokerAccount>(account.Id) is null)
+            if (!DBCache.AccountIdsDone.Contains(account.Id))
+            {
                 DBCache.dbctx.Add((BrokerAccount)Item);
+                DBCache.AccountIdsDone.Add(account.Id);
+            }
         }
         else if (Type == typeof(TimeInfo))
             DBCache.dbctx.Add((TimeInfo)Item);
@@ -30,6 +33,7 @@ public static class DBCache
     public static Dictionary<Type, ConcurrentDictionary<long, object>> HCache = new();
 
     public static ConcurrentQueue<DBCacheItemAddition> ItemQueue = new();
+    public static List<long> AccountIdsDone = new();
 
     public static BrokerContext dbctx { get; set; }
 

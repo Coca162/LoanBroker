@@ -68,7 +68,7 @@ BrokerContext.RawSqlQuery<string>(sql, null, true);
 
 await DBCache.LoadAsync();
 
-LoanSystem.CurrentBaseInterestRate = (await dbctx.Loans.Where(x => x.IsActive).OrderByDescending(x => x.Start).FirstOrDefaultAsync())?.Interest ?? 0.05m;
+LoanSystem.CurrentBaseInterestRate = (await dbctx.Loans.Where(x => x.IsActive).OrderByDescending(x => x.Start).FirstOrDefaultAsync())?.BaseInterest ?? 0.05m;
 
 builder.Services.AddDbContextPool<BrokerContext>(options =>
 {

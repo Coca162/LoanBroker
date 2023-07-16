@@ -5,14 +5,9 @@ public class DepositWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     public readonly ILogger<DepositWorker> _logger;
 
-    private readonly BrokerContext _dbctx;
-
-    public DepositWorker(ILogger<DepositWorker> logger,
-                        IServiceScopeFactory scopeFactory)
+    public DepositWorker(ILogger<DepositWorker> logger)
     {
         _logger = logger;
-        _scopeFactory = scopeFactory;
-        _dbctx = BrokerContext.DbFactory.CreateDbContext();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -25,6 +20,8 @@ public class DepositWorker : BackgroundService
                 {
                     try
                     {
+                        using var _dbctx = BrokerContext.DbFactory.CreateDbContext();
+
                         if (DateTime.UtcNow.Subtract(DBCache.TimeInfo.LastLoanUpdate).TotalHours >= 1)
                         {
                             await AccountSystem.DoHourlyTick(_dbctx);
@@ -35,8 +32,6 @@ public class DepositWorker : BackgroundService
                         await AccountSystem.UpdateDeposits(_dbctx);
 
                         await _dbctx.SaveChangesAsync();
-
-                        await DBCache.SaveAsync();
 
                         //await Task.Delay(1000 * 60 * 60);
                         await Task.Delay(1000 * 60 * 1);
@@ -54,7 +49,8 @@ public class DepositWorker : BackgroundService
 
             while (!task.IsCompleted)
             {
-                await Task.Delay(60_000, stoppingToken);
+                await DBCache.SaveAsync();
+                await Task.Delay(10_000, stoppingToken);
             }
 
             _logger.LogInformation("Economy Worker task stopped at: {time}", DateTimeOffset.Now);
