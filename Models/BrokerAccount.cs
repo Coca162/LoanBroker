@@ -205,7 +205,7 @@ public class BrokerAccount
             hoursSinceFirstLoan += 1.0;
             var newmonthlyprofit = monthlyprofit;
             if (hoursSinceFirstLoan < 24 * 7) {
-                newmonthlyprofit *= ((decimal)hoursSinceFirstLoan / (24.0m * 7.0m));
+                newmonthlyprofit *= Math.Max(((decimal)hoursSinceFirstLoan / (24.0m * 7.0m)), 0.25m);
             }
             Console.WriteLine($"{group.Name}: ${monthlyprofit:n0} ${newmonthlyprofit:n0} (adjusted) (+{Math.Pow((double)newmonthlyprofit, 0.4):n0})");
             score += (int)Math.Pow((double)newmonthlyprofit, 0.4);
@@ -265,7 +265,7 @@ public class BrokerAccount
             hoursSinceFirstLoan += 1.0;
             var leftover = maxloan - 50_000.0m;
             if (hoursSinceFirstLoan < 24 * 7) {
-                leftover *= ((decimal)hoursSinceFirstLoan / (24.0m * 7.0m));
+                leftover *= Math.Max(((decimal)hoursSinceFirstLoan / (24.0m * 7.0m)), 0.25m);
             }
             maxloan = 50_000.0m + leftover;
         }
