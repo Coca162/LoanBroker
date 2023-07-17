@@ -242,7 +242,7 @@ public class BrokerAccount
                 if (maxloan > 30_000.0m) {
                     var leftover = maxloan - 30_000.0m;
                     if (hoursSinceFirstLoan < 24 * 7) {
-                        leftover = leftover / ((decimal)hoursSinceFirstLoan / (24.0m * 7.0m));
+                        leftover *= leftover / ((decimal)hoursSinceFirstLoan / (24.0m * 7.0m));
                     }
                     maxloan = 30_000.0m + leftover;
                 }
@@ -255,7 +255,7 @@ public class BrokerAccount
             hoursSinceFirstLoan += 1.0;
             var leftover = maxloan - 50_000.0m;
             if (hoursSinceFirstLoan < 24 * 7) {
-                leftover /= ((decimal)hoursSinceFirstLoan / (24.0m * 7.0m));
+                leftover *= ((decimal)hoursSinceFirstLoan / (24.0m * 7.0m));
             }
             maxloan = 50_000.0m + leftover;
         }
