@@ -149,7 +149,7 @@ public class BrokerAccount
                 {
                     var gdp = decimal.Parse(stringresult);
                     if (gdp <= 10_000.0m) gdp = 10_000.0m;
-                    maxloan += gdp * 1.25m;
+                    maxloan += gdp * 1.25m / 15.0m;
                     score -= (int)Math.Max((((debtcapacityUsed / gdp) / 0.75m) * 300.0m) - 100.0m, 0.0m);
                 }
             }
@@ -163,7 +163,7 @@ public class BrokerAccount
                 {
                     var gdp = decimal.Parse(stringresult);
                     if (gdp <= 10_000.0m) gdp = 10_000.0m;
-                    maxloan += gdp * 0.35m;
+                    maxloan += gdp * 0.35m / 10.0m;;
                     score -= (int)Math.Max((((debtcapacityUsed / gdp) / 0.25m) * 300.0m) - 125.0m, 0.0m);
                 }
             }
