@@ -34,7 +34,7 @@ public static class AccountSystem
 
         // so if baseline is 5%
         // range will be 4.75% to 7.5%
-        var lowerBound = LoanSystem.CurrentBaseInterestRate * 0.95m;
+        var lowerBound = LoanSystem.CurrentBaseInterestRate * 0.99m;
         var upperBound = LoanSystem.CurrentBaseInterestRate * 2.25m;
         var increasePerDepositForBelow = (LoanSystem.CurrentBaseInterestRate - lowerBound) / countBelowBaseline;
         var increasePerDepositForAbove = (upperBound - LoanSystem.CurrentBaseInterestRate) / countAboveBaseline;
