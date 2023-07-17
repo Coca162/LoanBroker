@@ -199,6 +199,7 @@ public class BrokerAccount
                 maxloan += add / 10.0m;
             else
                 maxloan += add;
+            Console.WriteLine($"{group.Name}: ${monthlyprofit:n0)} (+{Math.Pow((double)monthlyprofit, 0.4):n0})");
             score += (int)Math.Pow((double)monthlyprofit, 0.4);
         }
         else if (monthlyprofit > -1000.00m)
@@ -210,7 +211,6 @@ public class BrokerAccount
             // means entity has made a loss and their credit score should be reduced because of that
         }
 
-        CreditScore = score;
         if (group is not null && group.OwnerId < 200 && group.GroupType != GroupTypes.Nation && group.GroupType != GroupTypes.State && group.GroupType != GroupTypes.Province) 
             maxloan *= 1.5m;
         else if (group is null || group.GroupType is GroupTypes.Company or GroupTypes.Corporation)
@@ -218,6 +218,8 @@ public class BrokerAccount
 
         if (score >= 999)
             score = 999;
+
+        CreditScore = score;
 
         if (score > 950)
             maxloan += 250_000.0m;
