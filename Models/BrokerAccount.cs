@@ -178,6 +178,9 @@ public class BrokerAccount
 
         var monthlyprofit = 0.00m;
         
+        if (records.Count < 3) {
+            records.Add(new() { Balance = 0.0m, TaxableBalance = 0.0m } );
+        }
         records.Add(new() { Balance = entity.Balance, TaxableBalance = entity.TaxableBalance});
         var lastbalance = records.First().TaxableBalance;
         foreach (var record in records)
