@@ -176,37 +176,36 @@ public class BrokerAccount
             }
         }
 
-        if (records.Count >= 3)
+        var monthlyprofit = 0.00m;
+        
+        records.Add(new() { Balance = entity.Balance, TaxableBalance = entity.TaxableBalance});
+        var lastbalance = records.First().TaxableBalance;
+        foreach (var record in records)
         {
-            var monthlyprofit = 0.00m;
-            var lastbalance = records.First().TaxableBalance;
-            foreach (var record in records)
-            {
-                monthlyprofit += record.TaxableBalance - lastbalance;
-                lastbalance = record.TaxableBalance;
-            }
+            monthlyprofit += record.TaxableBalance - lastbalance;
+            lastbalance = record.TaxableBalance;
+        }
 
-            monthlyprofit *= Math.Max(1.0m, 30.0m / records.Count);
+        monthlyprofit *= Math.Max(1.0m, 30.0m / records.Count);
 
-            if (monthlyprofit > 0.00m)
-            {
-                // means entity has made a profit
-                var add = monthlyprofit * 6 / 2.5m;
-                if (group.GroupType is GroupTypes.Nation or GroupTypes.State or GroupTypes.Province)
-                    maxloan += add / 10.0m;
-                else
-                    maxloan += add;
-                score += (int)Math.Pow((double)monthlyprofit, 0.4);
-            }
-            else if (monthlyprofit > -1000.00m)
-            {
-                // means entity has made a small loss, most likey a newer entity
-            }
+        if (monthlyprofit > 0.00m)
+        {
+            // means entity has made a profit
+            var add = monthlyprofit * 6 / 2.5m;
+            if (group.GroupType is GroupTypes.Nation or GroupTypes.State or GroupTypes.Province)
+                maxloan += add / 10.0m;
             else
-            {
-                // means entity has made a loss and their credit score should be reduced because of that
-            }
-        } 
+                maxloan += add;
+            score += (int)Math.Pow((double)monthlyprofit, 0.4);
+        }
+        else if (monthlyprofit > -1000.00m)
+        {
+            // means entity has made a small loss, most likey a newer entity
+        }
+        else
+        {
+            // means entity has made a loss and their credit score should be reduced because of that
+        }
 
         CreditScore = score;
         if (group is not null && group.OwnerId < 200 && group.GroupType != GroupTypes.Nation && group.GroupType != GroupTypes.State && group.GroupType != GroupTypes.Province) 
