@@ -3,7 +3,7 @@
 namespace LoanBroker.Models.SVModels;
 
 [JsonDerivedType(typeof(Group), 0)]
-[JsonDerivedType(typeof(Group), 1)]
+[JsonDerivedType(typeof(User), 1)]
 public class BaseEntity
 {
     [JsonPropertyName("id")]
