@@ -149,7 +149,7 @@ public class BrokerAccount
                 {
                     var gdp = decimal.Parse(stringresult);
                     if (gdp <= 10_000.0m) gdp = 10_000.0m;
-                    maxloan += gdp * 1.25m / 15.0m;
+                    maxloan += gdp * 1.25m / 20.0m;
                     score -= (int)Math.Max((((debtcapacityUsed / gdp) / 0.75m) * 300.0m) - 100.0m, 0.0m);
                 }
             }
@@ -163,7 +163,7 @@ public class BrokerAccount
                 {
                     var gdp = decimal.Parse(stringresult);
                     if (gdp <= 10_000.0m) gdp = 10_000.0m;
-                    maxloan += gdp * 0.35m / 10.0m;;
+                    maxloan += gdp * 0.35m / 15.0m;;
                     score -= (int)Math.Max((((debtcapacityUsed / gdp) / 0.25m) * 300.0m) - 125.0m, 0.0m);
                 }
             }
@@ -198,7 +198,7 @@ public class BrokerAccount
             if (group.GroupType is GroupTypes.Nation or GroupTypes.State or GroupTypes.Province)
                 maxloan += add / 10.0m;
             else
-                maxloan += add;
+                maxloan += add / 3.0m;
             double hoursSinceFirstLoan = 0;
             if (FirstLoan is not null)
                 hoursSinceFirstLoan = DateTime.UtcNow.Subtract((DateTime)FirstLoan).TotalHours;
@@ -243,7 +243,7 @@ public class BrokerAccount
             if (maxloan > 750_000.0m)
             {
                 var leftover = maxloan - 750_000.0m;
-                maxloan = 750_000.0m + (decimal)Math.Pow((double)leftover, 0.925);
+                maxloan = 750_000.0m + (decimal)Math.Pow((double)leftover, 0.9);
             }
             double hoursSinceFirstLoan = 0;
             if (FirstLoan is not null)
@@ -256,6 +256,13 @@ public class BrokerAccount
                     }
                     maxloan = 30_000.0m + leftover;
                 }
+            }
+        }
+        else if (Id != 100) {
+            if (maxloan > 1_000_000.0m)
+            {
+                var leftover = maxloan - 1_000_000.0m;
+                maxloan = 1_000_000.0m + (decimal)Math.Pow((double)leftover, 0.925);
             }
         }
         if (Id != 100 && maxloan > 50_000.0m) {
