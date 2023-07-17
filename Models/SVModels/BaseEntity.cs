@@ -12,4 +12,10 @@ public class BaseEntity
 
     [JsonPropertyName("entityType")]
     public EntityType EntityType { get; set; }
+
+    [JsonPropertyName("balance")]
+    public decimal Balance { get; set; }
+
+    [JsonPropertyName("taxableBalance")]
+    public decimal TaxableBalance { get; set; }
 }
