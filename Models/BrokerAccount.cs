@@ -202,7 +202,7 @@ public class BrokerAccount
             double hoursSinceFirstLoan = 0;
             if (FirstLoan is not null)
                 hoursSinceFirstLoan = DateTime.UtcNow.Subtract((DateTime)FirstLoan).TotalHours;
-            hoursSinceFirstLoan += 1.0;
+            hoursSinceFirstLoan += 4.0;
             var newmonthlyprofit = monthlyprofit;
             if (hoursSinceFirstLoan < 24 * 7) {
                 newmonthlyprofit *= ((decimal)hoursSinceFirstLoan / (24.0m * 7.0m));
@@ -269,7 +269,7 @@ public class BrokerAccount
             double hoursSinceFirstLoan = 0;
             if (FirstLoan is not null)
                 hoursSinceFirstLoan = DateTime.UtcNow.Subtract((DateTime)FirstLoan).TotalHours;
-            hoursSinceFirstLoan += 1.0;
+            hoursSinceFirstLoan += 8.0;
             var leftover = maxloan - 50_000.0m;
             if (hoursSinceFirstLoan < 24 * 7) {
                 leftover *= ((decimal)hoursSinceFirstLoan / (24.0m * 7.0m));
