@@ -16,6 +16,6 @@ public class BaseEntity
     [JsonPropertyName("balance")]
     public decimal Balance { get; set; }
 
-    [JsonPropertyName("taxableBalance")]
+    [JsonPropertyName("taxAbleBalance")]
     public decimal TaxableBalance { get; set; }
 }
