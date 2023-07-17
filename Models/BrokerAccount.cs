@@ -207,7 +207,7 @@ public class BrokerAccount
             if (hoursSinceFirstLoan < 24 * 7) {
                 newmonthlyprofit *= ((decimal)hoursSinceFirstLoan / (24.0m * 7.0m));
             }
-            Console.WriteLine($"{group.Name}: ${monthlyprofit:n0} ${newmonthlyprofit:n0)} (adjusted) (+{Math.Pow((double)newmonthlyprofit, 0.4):n0})");
+            Console.WriteLine($"{group.Name}: ${monthlyprofit:n0} ${newmonthlyprofit:n0} (adjusted) (+{Math.Pow((double)newmonthlyprofit, 0.4):n0})");
             score += (int)Math.Pow((double)newmonthlyprofit, 0.4);
         }
         else if (monthlyprofit > -1000.00m)
@@ -302,6 +302,8 @@ public class BrokerAccount
             return new TaskResult(false, "You lack the availble credit to take out this loan!");
 
         var ownershipChain = await GetOwnershipChain();
+        foreach (var entity in ownershipChain)
+            Console.WriteLine($"{entity.Name}: {entity.EntityType}");
         var lastSeparateEntity = ownershipChain.FirstOrDefault(x => x.EntityType == EntityType.User || (x.EntityType == EntityType.Group && ((Group)x).Flags.Contains(GroupFlag.SeparateEntityFromOwner)));
         var getLastSeparateEntityOwnedGroups = await GetOwnedGroups(lastSeparateEntity.Id);
         var getLastSeparateEntityOwnedGroupsIds = getLastSeparateEntityOwnedGroups.Select(x => x.Id).ToList();
