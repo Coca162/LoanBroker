@@ -301,18 +301,22 @@ public class BrokerAccount
         if ((await GetDebtCapacityUsed(dbctx) + amount) > MaxLoan)
             return new TaskResult(false, "You lack the availble credit to take out this loan!");
 
-        var ownershipChain = await GetOwnershipChain();
-        foreach (var entity in ownershipChain)
-            Console.WriteLine($"{entity.Name}: {entity.EntityType}");
-        var lastSeparateEntity = ownershipChain.FirstOrDefault(x => x.EntityType == EntityType.User || (x.EntityType == EntityType.Group && ((Group)x).Flags.Contains(GroupFlag.SeparateEntityFromOwner)));
-        var getLastSeparateEntityOwnedGroups = await GetOwnedGroups(lastSeparateEntity.Id);
-        var getLastSeparateEntityOwnedGroupsIds = getLastSeparateEntityOwnedGroups.Select(x => x.Id).ToList();
+        var _entity = await GetEntityAsync();
+        if (!(_entity.EntityType is EntityType.Group && ((Group)_entity).Flags.Contains(GroupFlag.SeparateEntityFromOwner)))
+        {
+            var ownershipChain = await GetOwnershipChain();
+            foreach (var entity in ownershipChain)
+                Console.WriteLine($"{entity.Name}: {entity.EntityType}");
+            var lastSeparateEntity = ownershipChain.FirstOrDefault(x => x.EntityType == EntityType.User || (x.EntityType == EntityType.Group && ((Group)x).Flags.Contains(GroupFlag.SeparateEntityFromOwner)));
+            var getLastSeparateEntityOwnedGroups = await GetOwnedGroups(lastSeparateEntity.Id);
+            var getLastSeparateEntityOwnedGroupsIds = getLastSeparateEntityOwnedGroups.Select(x => x.Id).ToList();
 
-        // grab total debt capacity used by ALL deposit account the Last Seperate Entity
-        var totalDCUsedByChildren = (await dbctx.Loans.Where(x => getLastSeparateEntityOwnedGroupsIds.Contains(x.AccountId) && x.IsActive).ToListAsync()).Sum(x => (1.0m / (1.0m + x.TotalInterestRate)) * (x.TotalAmount - x.PaidBack));
-        if (totalDCUsedByChildren + amount >= 1_500_000.0m)
-            return new TaskResult(false, $"Debt (not including interest) from All groups whose {lastSeparateEntity.Name} is their highest level owner that has the SeparateFromOwner Flag (users automatically have this flag), is ${totalDCUsedByChildren:n0}. Taking out a loan for this account of this amount will make the prev stated amount go over the limit of $1,500,000! Contract Superjacobl, the CFV, to make a request to give this acccount the SeparateFromOwner flag. Basically, if Super Pog Inc owns A Inc and B Inc, and A Inc has $1,000,000 of debt (excluding interest) and B Inc has $200,000 of debt, then A Inc or B Inc can only take out $100,000 more dollars of debt.");
+            // grab total debt capacity used by ALL deposit account the Last Seperate Entity
+            var totalDCUsedByChildren = (await dbctx.Loans.Where(x => getLastSeparateEntityOwnedGroupsIds.Contains(x.AccountId) && x.IsActive).ToListAsync()).Sum(x => (1.0m / (1.0m + x.TotalInterestRate)) * (x.TotalAmount - x.PaidBack));
+            if (totalDCUsedByChildren + amount >= 1_500_000.0m)
+                return new TaskResult(false, $"Debt (not including interest) from All groups whose {lastSeparateEntity.Name} is their highest level owner that has the SeparateFromOwner Flag (users automatically have this flag), is ${totalDCUsedByChildren:n0}. Taking out a loan for this account of this amount will make the prev stated amount go over the limit of $1,500,000! Contract Superjacobl, the CFV, to make a request to give this acccount the SeparateFromOwner flag. Basically, if Super Pog Inc owns A Inc and B Inc, and A Inc has $1,000,000 of debt (excluding interest) and B Inc has $200,000 of debt, then A Inc or B Inc can only take out $100,000 more dollars of debt.");
 
+        }
         decimal got = 0;
         decimal leftover = 0.0m;
 
