@@ -199,8 +199,16 @@ public class BrokerAccount
                 maxloan += add / 10.0m;
             else
                 maxloan += add;
-            Console.WriteLine($"{group.Name}: ${monthlyprofit:n0)} (+{Math.Pow((double)monthlyprofit, 0.4):n0})");
-            score += (int)Math.Pow((double)monthlyprofit, 0.4);
+            double hoursSinceFirstLoan = 0;
+            if (FirstLoan is not null)
+                hoursSinceFirstLoan = DateTime.UtcNow.Subtract((DateTime)FirstLoan).TotalHours;
+            hoursSinceFirstLoan += 1.0;
+            var newmonthlyprofit = monthlyprofit;
+            if (hoursSinceFirstLoan < 24 * 7) {
+                newmonthlyprofit *= ((decimal)hoursSinceFirstLoan / (24.0m * 7.0m));
+            }
+            Console.WriteLine($"{group.Name}: ${monthlyprofit:n0} ${newmonthlyprofit:n0)} (adjusted) (+{Math.Pow((double)newmonthlyprofit, 0.4):n0})");
+            score += (int)Math.Pow((double)newmonthlyprofit, 0.4);
         }
         else if (monthlyprofit > -1000.00m)
         {
